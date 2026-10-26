@@ -6,3 +6,4 @@ dist
 .DS_Store
 PROMPT_*.md
 .claude
+*.tsbuildinfo
