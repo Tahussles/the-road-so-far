@@ -120,6 +120,7 @@ export default function Presenter() {
               players={room.players}
               votes={room.votes}
               taps={room.taps}
+              scores={room.scores}
               setPayload={setPayload}
               resetVotes={room.resetVotes}
               onWin={onWin}
@@ -303,7 +304,7 @@ function Win({ k, summary, next }: { k: number; summary?: Summary; next: string 
           <div className="flex justify-center gap-[1cqw] mt-[1.4cqw]">
             {stats.map(([key, v]) => (
               <div key={key} className="bg-white rounded-lg shadow-sticker px-[1.2cqw] py-[0.6cqw]">
-                <div className="font-display text-[2.2cqw] leading-none" style={{ color: accentVar(k) }}>{v}</div>
+                <div className="font-display text-[2.2cqw] leading-none" style={{ color: accentVar(k) }}>{typeof v === 'number' ? v.toLocaleString() : v}</div>
                 <div className="text-[1.1cqw] font-bold text-muted uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</div>
               </div>
             ))}

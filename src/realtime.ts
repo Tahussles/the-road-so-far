@@ -7,7 +7,7 @@ export type GameId = GameModule['id'];
 export type Phase = 'title' | 'travel' | 'story' | 'game' | 'win' | 'finale';
 // run bumps on every game (re)start so phones can unlock voting after R
 export type RoomState = { stopIndex: number; phase: Phase; gameId: GameId | null; payload: unknown; run: number };
-type Input = { id: string; gameId: GameId; kind: 'vote' | 'tap'; value: number };
+type Input = { id: string; gameId: GameId; kind: 'vote' | 'tap' | 'score'; value: number };
 export type LinkStatus = 'live' | 'reconnecting';
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -166,6 +166,7 @@ export function useHostRoom(state: RoomState) {
   const [votes, setVotes] = useState<Record<string, number>>({});
   const votesRef = useRef<Record<string, number>>({});
   const [taps, setTaps] = useState<Record<string, number>>({});
+  const [scores, setScores] = useState<Record<string, number>>({});
   const [sim, setSim] = useState(false);
   const [totals, setTotals] = useState<Totals>({ taps: 0, votes: 0 });
   const stateRef = useRef(state);
@@ -203,6 +204,8 @@ export function useHostRoom(state: RoomState) {
     if (!live.length) return;
     const voteIn = live.filter((i) => i.kind === 'vote');
     const tapIn = live.filter((i) => i.kind === 'tap');
+    const scoreIn = live.filter((i) => i.kind === 'score');
+    if (scoreIn.length) setScores((sc) => { const n = { ...sc }; scoreIn.forEach((i) => (n[i.id] = i.value)); return n; });
     // totals count one vote per player per round, not every re-vote
     let fresh = 0;
     if (voteIn.length) {
@@ -257,19 +260,22 @@ export function useHostRoom(state: RoomState) {
   }, [sim]);
 
   const resetVotes = useCallback(() => { votesRef.current = {}; setVotes({}); }, []);
-  const resetGame = useCallback(() => { votesRef.current = {}; setVotes({}); setTaps({}); }, []);
+  const resetGame = useCallback(() => { votesRef.current = {}; setVotes({}); setTaps({}); setScores({}); }, []);
   const list = Object.values(players);
   // with Supabase, count phones currently in presence (plus sim); locally there is no presence
   const count = HAS_SUPABASE ? list.filter((p) => p.id.startsWith('sim-') || online.has(p.id)).length : list.length;
 
-  return { code, players: list, count, votes, taps, resetVotes, resetGame, sim, toggleSim: () => setSim((s) => !s), totals };
+  return { code, players: list, count, votes, taps, scores, resetVotes, resetGame, sim, toggleSim: () => setSim((s) => !s), totals };
 }
 
 // ---------- phone ----------
+// ?as=2 gives a tab its own player, so several test phones can share one browser
+const NS = new URLSearchParams(location.search).get('as') ?? '';
+
 function phoneId() {
   try {
-    let id = localStorage.getItem('rsf-id');
-    if (!id) { id = Math.random().toString(36).slice(2, 10); localStorage.setItem('rsf-id', id); }
+    let id = localStorage.getItem(`rsf-id${NS}`);
+    if (!id) { id = Math.random().toString(36).slice(2, 10); localStorage.setItem(`rsf-id${NS}`, id); }
     return id;
   } catch {
     return Math.random().toString(36).slice(2, 10);
@@ -279,7 +285,7 @@ function phoneId() {
 export function usePlayerRoom(code: string) {
   const [id] = useState(phoneId);
   const [me, setMe] = useState<Player | null>(() => {
-    try { const s = localStorage.getItem('rsf-me'); return s ? JSON.parse(s) : null; } catch { return null; }
+    try { const s = localStorage.getItem(`rsf-me${NS}`); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [state, setState] = useState<RoomState | null>(null);
   const [link, setLink] = useState<LinkStatus>('reconnecting');
@@ -292,6 +298,8 @@ export function usePlayerRoom(code: string) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const votedKey = useRef('');
+  // latest score for the current game instance; flushed with the taps
+  const score = useRef<{ key: string; value: number; sent: number | null }>({ key: '', value: 0, sent: null });
 
   useEffect(() => {
     if (!code) return;
@@ -309,9 +317,16 @@ export function usePlayerRoom(code: string) {
     const rejoin = HAS_SUPABASE ? undefined : setInterval(() => { if (meRef.current) t.send('join', meRef.current); }, 5000);
     const flush = setInterval(() => {
       const st = stateRef.current;
-      if (pending.current <= 0 || !st?.gameId) return;
-      t.send('input', { id, gameId: st.gameId, kind: 'tap', value: pending.current } satisfies Input);
-      pending.current = 0;
+      if (!st?.gameId) return;
+      if (pending.current > 0) {
+        t.send('input', { id, gameId: st.gameId, kind: 'tap', value: pending.current } satisfies Input);
+        pending.current = 0;
+      }
+      const sc = score.current;
+      if (sc.key === `${st.gameId}:${st.run}` && sc.value !== sc.sent) {
+        t.send('input', { id, gameId: st.gameId, kind: 'score', value: sc.value } satisfies Input);
+        sc.sent = sc.value;
+      }
     }, TAP_FLUSH_MS);
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => { clearInterval(rejoin); clearInterval(flush); clearInterval(tick); t.close(); tRef.current = null; };
@@ -320,7 +335,7 @@ export function usePlayerRoom(code: string) {
   const join = useCallback((name: string, emoji: string) => {
     const p = { id, name, emoji };
     setMe(p);
-    try { localStorage.setItem('rsf-me', JSON.stringify(p)); } catch {}
+    try { localStorage.setItem(`rsf-me${NS}`, JSON.stringify(p)); } catch {}
     tRef.current?.track(p);
     tRef.current?.send('join', p);
   }, [id]);
@@ -328,7 +343,14 @@ export function usePlayerRoom(code: string) {
   const send = useCallback((value: number) => {
     const st = stateRef.current;
     if (!st?.gameId || st.phase !== 'game') return;
-    if (GAMES[st.gameId].inputKind === 'tap') { pending.current += value; return; }
+    const kind = GAMES[st.gameId].inputKind;
+    if (kind === 'tap') { pending.current += value; return; }
+    if (kind === 'score') {
+      const key = `${st.gameId}:${st.run}`;
+      if (score.current.key !== key) score.current = { key, value, sent: null };
+      else score.current.value = value;
+      return;
+    }
     // one vote per round: repeat taps after voting are ignored
     const round = (st.payload as { round?: unknown } | null)?.round ?? '';
     const key = `${st.gameId}:${st.run}:${round}`;

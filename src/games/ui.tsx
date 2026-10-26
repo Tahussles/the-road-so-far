@@ -1,6 +1,6 @@
 // Shared helpers for the games. No network code here.
-import { useEffect, useRef, useState } from 'react';
-import type { ScreenProps } from './types';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Player, ScreenProps } from './types';
 import './games.css';
 
 export function buzz() {
@@ -130,4 +130,64 @@ export function VoteStrips({ options, counts, accent, glow, winner }: {
       ))}
     </div>
   );
+}
+
+// ---------- score games ----------
+
+// ms since this component mounted, ticking every 100 ms
+export function useElapsed(active = true) {
+  const [t0] = useState(() => Date.now());
+  const now = useNow(active);
+  return now - t0;
+}
+
+export function secsLeft(ms: number) {
+  return Math.max(0, Math.ceil(ms / 1000));
+}
+
+export function Countdown({ ms, accent }: { ms: number; accent: string }) {
+  const s = secsLeft(ms);
+  return (
+    <div className="g-count" style={{ background: s <= 5 ? 'var(--red)' : accent }}>
+      {s}<small>s</small>
+    </div>
+  );
+}
+
+// playerId -> score, best first. lowerIsBetter for things like months.
+export function ranked(scores: Record<string, number>, lowerIsBetter = false, keep: (v: number) => boolean = (v) => v > 0) {
+  return Object.entries(scores)
+    .filter(([, v]) => keep(v))
+    .sort((a, b) => (lowerIsBetter ? a[1] - b[1] : b[1] - a[1]));
+}
+
+// Live top 3. Rows are keyed by player, so they slide past each other when ranks change.
+export function Leaderboard({ players, rows, accent, label, fill, title = 'Top 3' }: {
+  players: Player[];
+  rows: [string, number][];
+  accent: string;
+  label: (v: number) => string;
+  fill?: (v: number) => number; // 0..1 bar length, for race lanes
+  title?: string;
+}) {
+  const top = rows.slice(0, 3);
+  return (
+    <div className="g-board">
+      <div className="g-sub">{title}</div>
+      <div className="g-board-rows">
+        {top.length === 0 && <div className="g-board-empty">Waiting for the first score...</div>}
+        {top.map(([id, v], i) => (
+          <div key={id} className="g-board-row" style={{ transform: `translateY(${i * 110}%)` }}>
+            {fill && <div className="g-board-fill" style={{ width: `${Math.max(8, Math.min(1, fill(v)) * 100)}%`, background: accent }} />}
+            <span className="g-board-name">{['🥇', '🥈', '🥉'][i]} {nameOf(players, id)}</span>
+            <span className="g-board-val">{label(v)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function Banner({ children, accent }: { children: ReactNode; accent: string }) {
+  return <div className="g-banner g-pop" style={{ background: accent }}>{children}</div>;
 }

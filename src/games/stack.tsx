@@ -1,114 +1,86 @@
-// Stop 1: GoonHacks / Scrollify. Pick the stack, mentors help from round 2.
-import { useEffect, useState } from 'react';
-import type { GameModule, ScreenProps } from './types';
-import { Timer, VoteController, VoteStrips, plurality, tally, useBroadcast, useLatest, useWinOnce, type VotePayload } from './ui';
+// Stop 1: GoonHacks / Scrollify. Scroll Race: scroll an endless feed, build a streak, mentors give a boost.
+import { useEffect, useRef, useState } from 'react';
+import type { ControllerProps, GameModule, ScreenProps } from './types';
+import { Banner, Countdown, Leaderboard, buzz, nameOf, ranked, useBroadcast, useElapsed, useWinOnce } from './ui';
 
-const ROUNDS = [
-  { q: 'What do we build?', options: ['Chrome extension', 'A PowerPoint', 'Excel macro', 'A fax machine'], correct: 0 },
-  { q: 'What is the app built in?', options: ['Scratch', 'SwiftUI', 'Microsoft Paint', 'Notepad'], correct: 1 },
-  { q: 'Where does the data live?', options: ['Sticky notes', 'localStorage forever', 'Supabase', 'Ask ChatGPT'], correct: 2 },
-];
-const VOTE_MS = 8000, LAND_MS = 2200, MENTOR_MS = 3000, FINAL_MS = 2400;
+const READY_MS = 3000;
+const GO_MS = 40000;
+const BOOST_AT = 18000; // after go starts
+const BOOST_MS = 5000;
+const END_MS = 4000; // podium before onWin
+const PX_PER_M = 30;
+const STREAK_STEP_MS = 2500; // +1 multiplier per 2.5 s of non stop scrolling
+const MAX_MULT = 5;
 
-type Phase = 'vote' | 'land' | 'mentors' | 'final';
-type Block = { label: string; ok: boolean };
+type Phase = 'ready' | 'go' | 'boost' | 'done';
+type Payload = { phase: Phase };
 
-function Screen({ votes, setPayload, resetVotes, onWin, accent }: ScreenProps) {
-  const [round, setRound] = useState(0);
-  const [phase, setPhase] = useState<Phase>('vote');
-  const [start, setStart] = useState(() => Date.now());
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [winner, setWinner] = useState<number | null>(null);
-  const votesRef = useLatest(votes);
+function phaseAt(ms: number): Phase {
+  if (ms < READY_MS) return 'ready';
+  const g = ms - READY_MS;
+  if (g >= GO_MS) return 'done';
+  if (g >= BOOST_AT && g < BOOST_AT + BOOST_MS) return 'boost';
+  return 'go';
+}
+
+function Screen({ players, scores, setPayload, onWin, accent }: ScreenProps) {
+  const ms = useElapsed();
+  const phase = phaseAt(ms);
   const win = useWinOnce(onWin);
-  const R = ROUNDS[round];
-  const mentors = round >= 1 || phase === 'mentors';
-  const glow = round >= 1 && phase === 'vote' ? R.correct : null;
+  const rows = ranked(scores);
+  const total = rows.reduce((a, [, v]) => a + v, 0);
+  const lead = rows[0]?.[1] ?? 1;
 
-  useEffect(() => { resetVotes(); }, []);
+  useBroadcast(setPayload, { phase } satisfies Payload);
 
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
-    if (phase === 'vote') {
-      t = setTimeout(() => {
-        const counts = tally(votesRef.current, R.options.length);
-        const anyVotes = counts.some((c) => c > 0);
-        const w = anyVotes ? plurality(counts, R.correct) : round === 0 ? 1 : R.correct;
-        setWinner(w);
-        setBlocks((b) => [...b, { label: R.options[w], ok: w === R.correct }]);
-        setPhase('land');
-      }, VOTE_MS);
-    } else if (phase === 'land') {
-      t = setTimeout(() => {
-        if (round === 0) setPhase('mentors');
-        else if (round === ROUNDS.length - 1) setPhase('final');
-        else next();
-      }, LAND_MS);
-    } else if (phase === 'mentors') {
-      t = setTimeout(next, MENTOR_MS);
-    } else if (phase === 'final') {
-      t = setTimeout(() => {
-        win({
-          line: 'Scrollify shipped.',
-          stats: { correct: blocks.filter((b) => b.ok).length, rounds: ROUNDS.length },
-        });
-      }, FINAL_MS);
-    }
-    return () => clearTimeout(t);
-    function next() {
-      resetVotes();
-      setWinner(null);
-      setRound((r) => r + 1);
-      setStart(Date.now());
-      setPhase('vote');
-    }
-  }, [phase, round]);
+    if (ms >= READY_MS + GO_MS + END_MS) win({ line: 'Scrollify shipped.', stats: { metresScrolled: total, best: rows[0]?.[1] ?? 0 } });
+  }, [ms >= READY_MS + GO_MS + END_MS]);
 
-  const payload: VotePayload = {
-    phase: phase === 'vote' ? 'vote' : 'wait',
-    round, question: R.q, options: R.options, glow,
-    note: phase === 'mentors' ? 'Mentors incoming! Watch for the glow' : phase === 'final' ? 'Scrollify shipped ✓' : 'Look up at the screen',
-  };
-  useBroadcast(setPayload, payload);
+  if (phase === 'ready') {
+    return (
+      <div className="g-wrap">
+        <div className="g-panel" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div className="g-big" style={{ fontSize: '3cqw', color: 'var(--muted)' }}>Scrollify made you scroll MORE</div>
+          <h2 className="g-title" style={{ color: accent, fontSize: '7cqw' }}>Scroll Race!</h2>
+          <div className="g-big" style={{ fontSize: '3.4cqw' }}>Scroll on your phone. Don't stop!</div>
+          <div className="g-big" style={{ fontSize: '9cqw', color: accent }}>{Math.max(1, Math.ceil((READY_MS - ms) / 1000))}</div>
+        </div>
+      </div>
+    );
+  }
 
-  const counts = tally(votes, R.options.length);
-
+  const left = READY_MS + GO_MS - ms;
   return (
     <div className="g-wrap">
-      <div className="g-panel" style={{ flexDirection: 'row', gap: '2.4cqw' }}>
-        <div style={{ flex: 1.4, display: 'flex', flexDirection: 'column', gap: '1.2cqw' }}>
-          <div className="g-sub">Round {round + 1} of {ROUNDS.length}{round === 0 ? ' · no hints, you are on your own' : ' · mentors are helping'}</div>
-          <h2 className="g-title" style={{ color: accent }}>{R.q}</h2>
-          {phase === 'vote' ? <Timer key={round} start={start} ms={VOTE_MS} accent={accent} /> : <div className="g-timer" />}
-          <VoteStrips options={R.options} counts={counts} accent={accent} glow={glow} winner={phase === 'vote' ? null : winner} />
-          {phase === 'mentors' && (
-            <div className="g-walk" style={{ display: 'flex', alignItems: 'center', gap: '1.4cqw', marginTop: 'auto' }}>
-              <span style={{ fontSize: '5cqw' }}>🧑‍🏫🧑‍💻</span>
-              <div className="paper sticker" style={{ borderRadius: 'var(--radius)', padding: '1cqw 1.4cqw', fontSize: '2cqw', fontWeight: 700 }}>
-                Two friends who had done hackathons before walk in. "Let us help."
-              </div>
-            </div>
-          )}
-          {mentors && phase !== 'mentors' && (
-            <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '1cqw', fontSize: '1.7cqw', fontWeight: 700, color: 'var(--muted)' }}>
-              <span style={{ fontSize: '3cqw' }}>🧑‍🏫🧑‍💻</span> Mentors point at the glowing answer
-            </div>
-          )}
+      <div className="g-panel">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2cqw' }}>
+          <div>
+            <h2 className="g-title" style={{ color: accent }}>{phase === 'done' ? 'Time! Scrollify shipped.' : 'Scroll Race'}</h2>
+            <div className="g-sub" style={{ fontSize: '2.2cqw' }}>Keep scrolling to grow your streak. Stop and it resets.</div>
+          </div>
+          {phase !== 'done' && <Countdown ms={left} accent={accent} />}
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--paper-warm)', borderRadius: 'var(--radius)', padding: '1.4cqw', border: '.25cqw dashed var(--paper-edge)' }}>
-          <div className="g-sub" style={{ textAlign: 'center' }}>Our stack</div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', gap: '.8cqw', justifyContent: 'flex-start' }}>
-            {blocks.map((b, i) => (
-              <div key={i} className={`g-drop`} style={{ animationDelay: '0s' }}>
-                <div className={`g-block ${b.ok ? '' : 'joke'}`} style={{ background: accent, transform: `rotate(${[-2, 1.5, -1][i] ?? 0}deg)` }}>
-                  {b.ok ? '' : '🤡 '}{b.label}
-                </div>
-              </div>
-            ))}
-            {phase === 'final' && (
-              <div className="g-drop">
-                <div className="g-block" style={{ background: 'var(--leaf)', fontSize: '2.8cqw', fontFamily: 'Fredoka, system-ui, sans-serif' }}>Scrollify ✓</div>
-              </div>
+        <div style={{ flex: 1, display: 'flex', gap: '2.4cqw', minHeight: 0 }}>
+          <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Leaderboard
+              players={players}
+              rows={rows}
+              accent={accent}
+              label={(v) => `${v.toLocaleString()} m`}
+              fill={(v) => v / lead}
+              title={phase === 'done' ? 'Final podium' : 'Top 3 scrollers'}
+            />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.6cqw', justifyContent: 'center', alignItems: 'stretch' }}>
+            {phase === 'boost' && <Banner accent="var(--leaf)">Mentors walked in! 2x speed for {Math.max(1, Math.ceil((READY_MS + BOOST_AT + BOOST_MS - ms) / 1000))}s</Banner>}
+            {phase === 'go' && ms - READY_MS < BOOST_AT && <div className="g-sub" style={{ textAlign: 'center' }}>Mentors arrive halfway...</div>}
+            <div className="paper sticker" style={{ borderRadius: 'var(--radius-lg)', padding: '1.6cqw', textAlign: 'center', transform: 'rotate(1.5deg)' }}>
+              <div className="g-sub">The whole room scrolled</div>
+              <div className="g-big" style={{ fontSize: '5cqw', color: accent }}>{total.toLocaleString()} m</div>
+            </div>
+            {phase === 'done' && rows[0] && (
+              <div className="g-big g-pop" style={{ fontSize: '2.6cqw', textAlign: 'center' }}>👑 {nameOf(players, rows[0][0])} wins!</div>
             )}
           </div>
         </div>
@@ -117,17 +89,110 @@ function Screen({ votes, setPayload, resetVotes, onWin, accent }: ScreenProps) {
   );
 }
 
+const FEED = [
+  ['🐱', 'Cat plays piano'], ['🍕', 'Pizza at 3 am'], ['🚌', 'Bus goes vroom'], ['🐶', 'Dog sees snow'],
+  ['🌮', 'Taco Tuesday'], ['🦆', 'Duck parade'], ['🎸', 'Guitar solo'], ['🌈', 'Double rainbow'],
+  ['🍩', 'Donut review'], ['🐸', 'Frog jumps far'], ['⚽', 'Wild goal'], ['🧁', 'Tiny cupcake'],
+  ['🐼', 'Panda rolls'], ['🍿', 'Movie night'], ['🛹', 'Skate trick'], ['🦄', 'Unicorn sighting'],
+];
+const CARD_BG = ['var(--stop-goon)', 'var(--teal)', 'var(--leaf)', 'var(--red)', 'var(--wood-shine)', 'var(--teal-deep)'];
+
+function Controller({ payload, send }: ControllerProps) {
+  const p = payload as Payload | null;
+  const phase = p?.phase ?? 'ready';
+  const live = phase === 'go' || phase === 'boost';
+  const [cards, setCards] = useState(40);
+  const [dist, setDist] = useState(0);
+  const [mult, setMult] = useState(1);
+  const ref = useRef<HTMLDivElement>(null);
+  const s = useRef({ lastY: 0, lastMove: 0, streakStart: 0, dist: 0, mult: 1 });
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
+  // streak resets after 1 s without scrolling
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (s.current.mult > 1 && Date.now() - s.current.lastMove > 1000) { s.current.mult = 1; setMult(1); }
+    }, 200);
+    return () => clearInterval(iv);
+  }, []);
+
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    const y = el.scrollTop;
+    const dy = y - s.current.lastY;
+    s.current.lastY = y;
+    if (el.scrollTop + el.clientHeight > el.scrollHeight - 1600) setCards((c) => c + 30);
+    const ph = phaseRef.current;
+    if (dy <= 0 || (ph !== 'go' && ph !== 'boost')) return;
+    const now = Date.now();
+    if (now - s.current.lastMove > 1000) s.current.streakStart = now;
+    s.current.lastMove = now;
+    const m = Math.min(MAX_MULT, 1 + Math.floor((now - s.current.streakStart) / STREAK_STEP_MS));
+    if (m !== s.current.mult) { s.current.mult = m; setMult(m); buzz(); }
+    s.current.dist += (dy / PX_PER_M) * m * (ph === 'boost' ? 2 : 1);
+    const d = Math.round(s.current.dist);
+    setDist(d);
+    send(d);
+  };
+
+  const head = phase === 'ready' ? 'Get ready to scroll!'
+    : phase === 'boost' ? 'Mentors walked in! 2x speed!'
+    : phase === 'done' ? "Time's up! Look up."
+    : 'Scroll! Don’t stop!';
+
+  return (
+    <div className="g-phone" style={{ gap: 10 }}>
+      <h3 style={{ fontSize: 26, color: phase === 'boost' ? 'var(--leaf)' : undefined }}>{head}</h3>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div className="g-stat" style={{ flex: 1 }}><b>{dist.toLocaleString()} m</b><span>scrolled</span></div>
+        <div className="g-stat" style={{ flex: 1, background: mult > 1 ? 'var(--stop-goon)' : undefined, color: mult > 1 ? 'var(--white)' : undefined }}>
+          <b>x{mult}{mult > 2 ? ' 🔥' : ''}</b><span>streak</span>
+        </div>
+      </div>
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="g-feed"
+        style={{ opacity: live ? 1 : 0.5, pointerEvents: phase === 'done' ? 'none' : undefined }}
+      >
+        {Array.from({ length: cards }, (_, i) => {
+          const [emoji, text] = FEED[i % FEED.length];
+          return (
+            <div key={i} className="g-card" style={{ background: CARD_BG[(i * 7) % CARD_BG.length] }}>
+              <span style={{ fontSize: 64 }}>{emoji}</span>
+              <span>{text}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// sim: each fake player scrolls at their own pace, with streaks and the occasional pause
+const simDist = new Map<string, number>();
+const simStreak = new Map<string, number>();
+
 export const stack: GameModule = {
   id: 'stack',
-  inputKind: 'vote',
+  inputKind: 'score',
   Screen,
-  Controller: VoteController,
+  Controller,
   simulate: (players, payload) => {
-    const p = payload as VotePayload | null;
-    if (!p || p.phase !== 'vote') return [];
-    return players.filter(() => Math.random() < 0.18).map((pl) => ({
-      playerId: pl.id,
-      value: p.glow !== null && Math.random() < 0.75 ? p.glow : Math.floor(Math.random() * p.options.length),
-    }));
+    const p = payload as Payload | null;
+    if (!p || p.phase === 'ready') { simDist.clear(); simStreak.clear(); return []; }
+    if (p.phase === 'done') return [];
+    return players.map((pl, i) => {
+      const paused = Math.random() < 0.08;
+      const streak = paused ? 0 : (simStreak.get(pl.id) ?? 0) + 1;
+      simStreak.set(pl.id, streak);
+      const mult = Math.min(MAX_MULT, 1 + Math.floor(streak / 8));
+      const step = paused ? 0 : (4 + (i % 7)) * mult * (p.phase === 'boost' ? 2 : 1) * (0.6 + Math.random() * 0.8);
+      const d = (simDist.get(pl.id) ?? 0) + step;
+      simDist.set(pl.id, d);
+      return { playerId: pl.id, value: Math.round(d) };
+    });
   },
 };

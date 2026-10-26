@@ -17,6 +17,7 @@ export default function Harness() {
   const [sim, setSim] = useState(true);
   const [votes, setVotes] = useState<Record<string, number>>({});
   const [taps, setTaps] = useState<Record<string, number>>({});
+  const [scores, setScores] = useState<Record<string, number>>({});
   const [payload, setPayload] = useState<unknown>(null);
   const [win, setWin] = useState<{ line: string; stats?: Record<string, number> } | null>(null);
   const payloadRef = useRef<unknown>(null);
@@ -24,13 +25,14 @@ export default function Harness() {
   const game = GAMES[id];
 
   useEffect(() => {
-    setVotes({}); setTaps({}); setPayload(null); setWin(null);
+    setVotes({}); setTaps({}); setScores({}); setPayload(null); setWin(null);
     if (!sim) return;
     let tick = 0;
     const iv = setInterval(() => {
       const inputs = game.simulate(FAKE, payloadRef.current, tick++);
       if (!inputs.length) return;
       if (game.inputKind === 'vote') setVotes((v) => { const n = { ...v }; inputs.forEach((x) => (n[x.playerId] = x.value)); return n; });
+      else if (game.inputKind === 'score') setScores((v) => { const n = { ...v }; inputs.forEach((x) => (n[x.playerId] = x.value)); return n; });
       else setTaps((t) => { const n = { ...t }; inputs.forEach((x) => (n[x.playerId] = (n[x.playerId] ?? 0) + x.value)); return n; });
     }, 300);
     return () => clearInterval(iv);
@@ -38,6 +40,7 @@ export default function Harness() {
 
   const send = useCallback((value: number) => {
     if (game.inputKind === 'vote') setVotes((v) => ({ ...v, me: value }));
+    else if (game.inputKind === 'score') setScores((v) => ({ ...v, me: value }));
     else setTaps((t) => ({ ...t, me: (t.me ?? 0) + value }));
   }, [game]);
   const resetVotes = useCallback(() => setVotes({}), []);
@@ -62,7 +65,7 @@ export default function Harness() {
       <div className="flex gap-4 items-start">
         <div className="flex-1 aspect-video relative overflow-hidden rounded-lg" style={{ background: 'var(--wood)', containerType: 'inline-size' }}>
           <div className="absolute inset-0 flex items-center justify-center p-[3cqw] pt-[6cqw]">
-            <game.Screen key={`${id}-${run}`} players={FAKE} votes={votes} taps={taps} setPayload={setPayload}
+            <game.Screen key={`${id}-${run}`} players={FAKE} votes={votes} taps={taps} scores={scores} setPayload={setPayload}
               resetVotes={resetVotes} onWin={onWin} accent={ACCENT[id]} />
           </div>
         </div>
