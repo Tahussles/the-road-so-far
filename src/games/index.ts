@@ -1,12 +1,7 @@
 import type { GameModule } from './types';
-import { STUBS } from './stubs';
 import { stack } from './stack';
 import { rebuild } from './rebuild';
 import { priya } from './priya';
+import { bots } from './bots';
 
-export const GAMES: Record<GameModule['id'], GameModule> = {
-  stack,
-  rebuild,
-  priya,
-  bots: STUBS.bots,
-};
+export const GAMES: Record<GameModule['id'], GameModule> = { stack, rebuild, priya, bots };
