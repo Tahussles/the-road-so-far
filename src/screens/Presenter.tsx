@@ -129,7 +129,7 @@ export default function Presenter() {
           </div>
         )}
         {step.t === 'win' && <Win k={k} summary={summaries[k]} next={k < 3 ? STOPS[k + 1].name : 'the finale'} />}
-        {step.t === 'finale' && <Finale passengers={room.count} totals={room.totals} />}
+        {step.t === 'finale' && <Finale passengers={room.count} totals={room.totals} summaries={summaries} />}
 
         <Hud code={room.code} url={joinUrl} count={room.count} sim={room.sim} hidden={step.t === 'title'} />
         <div className="absolute bottom-[0.8cqw] left-[1cqw] text-[1.1cqw] font-bold text-white/70">
@@ -316,7 +316,16 @@ function Win({ k, summary, next }: { k: number; summary?: Summary; next: string 
   );
 }
 
-function Finale({ passengers, totals }: { passengers: number; totals: { taps: number; votes: number } }) {
+function Finale({ passengers, totals, summaries }: { passengers: number; totals: { taps: number; votes: number }; summaries: Record<number, Summary> }) {
+  // headline numbers come from each game's onWin stats; taps and votes only show if a game used them
+  const chips: [string, number][] = [
+    ['passengers', passengers],
+    ['metres scrolled', summaries[0]?.stats?.metresScrolled ?? 0],
+    ['jobs done', summaries[3]?.stats?.jobsDone ?? 0],
+    ['taps', totals.taps],
+    ['votes', totals.votes],
+  ];
+  const shown = chips.filter(([label, v]) => label === 'passengers' || v > 0);
   const beats = STOPS.map((s, i) => ({ word: s.beat, color: accentVar(i) }));
   return (
     <div className="absolute inset-0 flex items-end justify-center pb-[4cqw]">
@@ -334,7 +343,7 @@ function Finale({ passengers, totals }: { passengers: number; totals: { taps: nu
         </div>
         <h2 className="sunset-text text-[4.4cqw] leading-none mt-[1.2cqw] rsf-fadeup" style={{ animationDelay: '3.2s' }}>Thanks for riding with us.</h2>
         <div className="flex justify-center gap-[1.2cqw] mt-[1.4cqw] rsf-fadeup" style={{ animationDelay: '3.8s' }}>
-          {[['passengers', passengers], ['taps', totals.taps], ['votes', totals.votes]].map(([label, v]) => (
+          {shown.map(([label, v]) => (
             <div key={label} className="bg-white rounded-lg shadow-sticker px-[1.6cqw] py-[0.7cqw] min-w-[10cqw]">
               <div className="font-display text-[2.8cqw] leading-none text-ink-brown">{Number(v).toLocaleString()}</div>
               <div className="text-[1.2cqw] font-bold text-muted uppercase tracking-wider">{label}</div>
