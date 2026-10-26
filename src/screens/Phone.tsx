@@ -7,7 +7,7 @@ const buzz = (ms = 15) => { try { navigator.vibrate?.(ms); } catch {} };
 
 export default function Phone() {
   const code = (new URLSearchParams(location.search).get('room') ?? '').toUpperCase();
-  const { me, join, state, send } = usePlayerRoom(code);
+  const { me, join, state, send, live } = usePlayerRoom(code);
 
   if (!code) return <Shell><Card><h2 className="text-3xl text-ink-brown">No room code</h2><p className="mt-2 text-lg">Scan the QR on the big screen to hop on.</p></Card></Shell>;
   if (!me) return <Join code={code} onJoin={join} />;
@@ -45,7 +45,10 @@ export default function Phone() {
     <Shell>
       <div className="w-full flex items-center justify-between mb-4">
         <div className="paper rounded-lg px-3 py-1 font-bold text-ink-brown shadow-sticker">{me.emoji} {me.name}</div>
-        <div className="paper rounded-lg px-3 py-1 font-bold text-muted shadow-sticker">Room {code}</div>
+        <div className="paper rounded-lg px-3 py-1 font-bold text-muted shadow-sticker flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: live ? 'var(--leaf)' : 'var(--wood-shine)' }} />
+          {live ? 'Live' : 'Reconnecting'} / {code}
+        </div>
       </div>
       {body}
     </Shell>
@@ -81,26 +84,29 @@ function Join({ code, onJoin }: { code: string; onJoin: (name: string, emoji: st
       <Card>
         <h2 className="text-3xl text-ink-brown">Hop on the bus</h2>
         <p className="text-muted mt-1">Room {code}</p>
+        <p className="mt-3 font-bold text-ink-brown">Pick your rider</p>
+        <div className="grid grid-cols-6 gap-2 mt-4" role="radiogroup" aria-label="Pick your rider">
+          {EMOJIS.slice(0, 18).map((e) => (
+            <button
+              key={e}
+              className={`text-3xl rounded-lg h-16 ${e === emoji ? 'bg-paper-warm ring-4 ring-[var(--wood-shine)]' : 'bg-paper'}`}
+              onClick={() => { buzz(8); setEmoji(e); }}
+            >{e}</button>
+          ))}
+        </div>
         <input
-          className="mt-4 w-full rounded-lg border-4 border-paper-edge px-4 py-4 text-2xl font-bold text-ink bg-paper outline-none focus:border-[var(--wood-shine)]"
+          className="mt-5 w-full rounded-lg border-4 border-paper-edge px-4 py-4 text-2xl font-bold text-ink bg-paper outline-none focus:border-[var(--wood-shine)]"
           style={{ fontSize: 24 }}
           placeholder="Your name"
+          enterKeyHint="go"
+          autoComplete="nickname"
           maxLength={14}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && ok) onJoin(name.trim(), emoji); }}
         />
-        <div className="grid grid-cols-6 gap-2 mt-4">
-          {EMOJIS.slice(0, 18).map((e) => (
-            <button
-              key={e}
-              className={`text-3xl rounded-lg py-2 ${e === emoji ? 'bg-paper-warm ring-4 ring-[var(--wood-shine)]' : 'bg-paper'}`}
-              onClick={() => { buzz(8); setEmoji(e); }}
-            >{e}</button>
-          ))}
-        </div>
         <button
-          className="btn-sunset w-full mt-5 py-5 text-2xl disabled:opacity-50"
+          className="btn-sunset w-full mt-3 min-h-[72px] text-2xl disabled:opacity-50"
           disabled={!ok}
           onClick={() => { buzz(30); onJoin(name.trim(), emoji); }}
         >Get on the bus {emoji}</button>

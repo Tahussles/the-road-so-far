@@ -14,8 +14,18 @@ type Summary = { line: string; stats?: Record<string, number> };
 
 export default function Presenter() {
   const [pi, setPi] = useState(0);
-  const [payload, setPayload] = useState<unknown>(null);
   const [run, setRun] = useState(0);
+  // payload is tagged with the game instance that set it, so a new game starts from null
+  // without a reset effect that would race the Screen's first setPayload
+  const [payloadBox, setPayloadBox] = useState<{ key: string; json: string; value: unknown }>({ key: '', json: 'null', value: null });
+  const gameKey = `${pi}-${run}`;
+  const gameKeyRef = useRef(gameKey);
+  gameKeyRef.current = gameKey;
+  const payload = payloadBox.key === gameKey ? payloadBox.value : null;
+  const setPayload = useCallback((p: unknown) => {
+    const json = JSON.stringify(p) ?? 'null';
+    setPayloadBox((cur) => (cur.key === gameKeyRef.current && cur.json === json ? cur : { key: gameKeyRef.current, json, value: p }));
+  }, []);
   const [summaries, setSummaries] = useState<Record<number, Summary>>({});
   const [bigQr, setBigQr] = useState(false);
   const step = STEPS[pi];
@@ -23,8 +33,8 @@ export default function Presenter() {
   const stop = STOPS[k];
 
   const state: RoomState = useMemo(
-    () => ({ stopIndex: step.k ?? -1, phase: step.t, gameId: step.t === 'game' ? stop.gameId : null, payload: step.t === 'game' ? payload : null }),
-    [pi, payload],
+    () => ({ stopIndex: step.k ?? -1, phase: step.t, gameId: step.t === 'game' ? stop.gameId : null, payload: step.t === 'game' ? payload : null, run }),
+    [pi, payload, run],
   );
   const room = useHostRoom(state);
   const joinUrl = `${location.origin}/play?room=${room.code}`;
@@ -63,7 +73,7 @@ export default function Presenter() {
 
   // fresh game state on enter
   useEffect(() => {
-    if (step.t === 'game') { room.resetGame(); setPayload(null); }
+    if (step.t === 'game') room.resetGame();
   }, [pi, run]);
 
   const onWin = useCallback((s: Summary) => {
@@ -121,7 +131,7 @@ export default function Presenter() {
         {step.t === 'finale' && <Finale passengers={room.count} totals={room.totals} />}
 
         <Hud code={room.code} url={joinUrl} count={room.count} sim={room.sim} hidden={step.t === 'title'} />
-        <div className="absolute bottom-[0.8cqw] left-[1cqw] text-[0.9cqw] font-bold text-white/70">
+        <div className="absolute bottom-[0.8cqw] left-[1cqw] text-[1.1cqw] font-bold text-white/70">
           {pi + 1}/{STEPS.length} {step.t}{step.k !== undefined ? ` / ${stop.name}` : ''}
           {!HAS_SUPABASE && ' / local mode'}
         </div>
@@ -145,8 +155,8 @@ function Hud({ code, url, count, sim, hidden }: { code: string; url: string; cou
       <QRCodeSVG value={url} size={160} style={{ width: '6cqw', height: '6cqw' }} fgColor="#2f1604" bgColor="transparent" />
       <div className="pr-[0.4cqw]">
         <div className="font-display text-[1.5cqw] leading-none text-ink-brown">{code}</div>
-        <div className="text-[1cqw] font-bold text-muted mt-[0.3cqw]">{count} on the bus</div>
-        {sim && <div className="text-[0.8cqw] font-bold text-red-text mt-[0.2cqw]">SIM MODE</div>}
+        <div className="text-[1.2cqw] font-bold text-muted mt-[0.3cqw]">{count} on the bus</div>
+        {sim && <div className="text-[1cqw] font-bold text-red-text mt-[0.2cqw]">SIM MODE</div>}
       </div>
     </div>
   );
@@ -159,10 +169,10 @@ function Title({ code, url, players }: { code: string; url: string; players: { i
         <Tape className="-top-[1.2cqw] left-[6cqw] rotate-[-6deg]" />
         <Tape className="-top-[1.2cqw] right-[6cqw] rotate-[5deg]" />
         <div className="max-w-[40cqw]">
-          <div className="font-bold uppercase tracking-[0.2em] text-[1.1cqw] text-muted">A ride through 4 hackathons</div>
+          <div className="font-bold uppercase tracking-[0.2em] text-[1.25cqw] text-muted">A ride through 4 hackathons</div>
           <h1 className="sunset-text text-[7.2cqw] leading-[0.95] mt-[0.6cqw]">The Road<br />So Far</h1>
           <p className="text-[1.6cqw] font-bold text-ink mt-[1cqw]">Taha Hussain &amp; Ebrahim Zuberi</p>
-          <p className="text-[1.25cqw] text-muted mt-[1.4cqw]">Scan to hop on the bus. You play a minigame at every stop.</p>
+          <p className="text-[1.4cqw] text-muted mt-[1.4cqw]">Scan to hop on the bus. You play a minigame at every stop.</p>
           <div className="flex flex-wrap gap-[0.4cqw] mt-[1.2cqw] min-h-[3cqw] max-w-[40cqw]">
             {players.map((p) => (
               <span key={p.id} title={p.name} className="rsf-pop inline-flex items-center justify-center bg-white rounded-full shadow-sticker text-[1.9cqw] w-[3cqw] h-[3cqw]">
@@ -170,14 +180,14 @@ function Title({ code, url, players }: { code: string; url: string; players: { i
               </span>
             ))}
           </div>
-          <p className="text-[1.1cqw] font-bold text-ink-brown mt-[0.6cqw]">{players.length} on the bus</p>
+          <p className="text-[1.25cqw] font-bold text-ink-brown mt-[0.6cqw]">{players.length} on the bus</p>
         </div>
         <div className="flex flex-col items-center">
           <div className="bg-white p-[0.8cqw] rounded-lg shadow-sticker rotate-[2deg]">
             <QRCodeSVG value={url} size={512} style={{ width: '22cqw', height: '22cqw' }} fgColor="#2f1604" bgColor="#ffffff" />
           </div>
           <div className="font-display text-[2.4cqw] text-ink-brown mt-[1cqw]">Room {code}</div>
-          <div className="text-[1cqw] text-muted font-bold">{url.replace(/^https?:\/\//, '')}</div>
+          <div className="text-[1.6cqw] text-ink-brown font-bold">{url.replace(/^https?:\/\//, '')}</div>
         </div>
       </div>
     </div>
@@ -203,18 +213,18 @@ function Story({ k }: { k: number }) {
           <div className="font-bold uppercase tracking-[0.18em] text-[1.05cqw] text-muted">Stop {k + 1} / {s.where}</div>
           <h2 className="text-[4.2cqw] leading-none mt-[0.4cqw]" style={{ color: accent }}>{s.name}</h2>
           <div className="font-display text-[2.2cqw] text-ink-brown mt-[0.4cqw]">{s.project}</div>
-          <p className="text-[1.3cqw] text-ink mt-[0.8cqw] leading-snug">{s.about}</p>
+          <p className="text-[1.45cqw] text-ink mt-[0.8cqw] leading-snug">{s.about}</p>
           <div className="grid grid-cols-2 gap-[1.2cqw] mt-[1.4cqw]">
             <div className="rounded-lg p-[1cqw] bg-white/70 border-l-[0.4cqw]" style={{ borderColor: 'var(--red)' }}>
               <div className="font-display text-[1.3cqw] text-red-text">The struggle</div>
-              <p className="text-[1.15cqw] leading-snug mt-[0.3cqw]">{s.struggle}</p>
+              <p className="text-[1.4cqw] leading-snug mt-[0.3cqw]">{s.struggle}</p>
             </div>
             <div className="rounded-lg p-[1cqw] bg-white/70 border-l-[0.4cqw]" style={{ borderColor: 'var(--leaf)' }}>
               <div className="font-display text-[1.3cqw] text-leaf">Got us through</div>
-              <p className="text-[1.15cqw] leading-snug mt-[0.3cqw]">{s.through}</p>
+              <p className="text-[1.4cqw] leading-snug mt-[0.3cqw]">{s.through}</p>
             </div>
           </div>
-          <div className="mt-[1.2cqw] text-[1.1cqw] font-bold text-muted">Next: phones out. {s.gameTitle}.</div>
+          <div className="mt-[1.2cqw] text-[1.25cqw] font-bold text-muted">Next: phones out. {s.gameTitle}.</div>
         </div>
         <div className="relative w-[30cqw] h-[34cqw]">
           {s.photos.length === 0 ? (
@@ -275,7 +285,7 @@ function Win({ k, summary, next }: { k: number; summary?: Summary; next: string 
     <div className="absolute inset-0 flex items-center justify-center">
       <div className="relative paper sticker rounded-lg rotate-[1deg] px-[4cqw] py-[3cqw] text-center max-w-[60cqw] rsf-pop" style={{ borderWidth: '0.5cqw' }}>
         <Tape className="-top-[1.1cqw] left-1/2 -translate-x-1/2 rotate-[-3deg]" />
-        <div className="inline-flex items-center gap-[0.6cqw] font-bold uppercase tracking-[0.18em] text-[1.1cqw]" style={{ color: accentVar(k) }}>
+        <div className="inline-flex items-center gap-[0.6cqw] font-bold uppercase tracking-[0.18em] text-[1.25cqw]" style={{ color: accentVar(k) }}>
           <span className="inline-flex items-center justify-center w-[2.2cqw] h-[2.2cqw] rounded-full text-white text-[1.3cqw]" style={{ background: 'var(--leaf)' }}>✓</span>
           {s.name} complete
         </div>
@@ -287,12 +297,12 @@ function Win({ k, summary, next }: { k: number; summary?: Summary; next: string 
             {stats.map(([key, v]) => (
               <div key={key} className="bg-white rounded-lg shadow-sticker px-[1.2cqw] py-[0.6cqw]">
                 <div className="font-display text-[2.2cqw] leading-none" style={{ color: accentVar(k) }}>{v}</div>
-                <div className="text-[0.9cqw] font-bold text-muted uppercase tracking-wider">{key}</div>
+                <div className="text-[1.1cqw] font-bold text-muted uppercase tracking-wider">{key}</div>
               </div>
             ))}
           </div>
         )}
-        <p className="text-[1.1cqw] text-muted font-bold mt-[1.6cqw]">Press Next to drive to {next}</p>
+        <p className="text-[1.25cqw] text-muted font-bold mt-[1.6cqw]">Press Next to drive to {next}</p>
       </div>
     </div>
   );
@@ -305,7 +315,7 @@ function Finale({ passengers, totals }: { passengers: number; totals: { taps: nu
       <div className="relative paper sticker rounded-lg px-[4cqw] py-[2.4cqw] text-center rsf-pop" style={{ borderWidth: '0.5cqw' }}>
         <Tape className="-top-[1.1cqw] left-[4cqw] rotate-[-6deg]" />
         <Tape className="-top-[1.1cqw] right-[4cqw] rotate-[5deg]" />
-        <div className="font-bold uppercase tracking-[0.2em] text-[1.1cqw] text-muted">The road so far</div>
+        <div className="font-bold uppercase tracking-[0.2em] text-[1.25cqw] text-muted">The road so far</div>
         <div className="flex items-center justify-center gap-[1.2cqw] mt-[0.8cqw]">
           {beats.map((b, i) => (
             <span key={b.word} className="flex items-center gap-[1.2cqw]">
@@ -319,7 +329,7 @@ function Finale({ passengers, totals }: { passengers: number; totals: { taps: nu
           {[['passengers', passengers], ['taps', totals.taps], ['votes', totals.votes]].map(([label, v]) => (
             <div key={label} className="bg-white rounded-lg shadow-sticker px-[1.6cqw] py-[0.7cqw] min-w-[10cqw]">
               <div className="font-display text-[2.8cqw] leading-none text-ink-brown">{Number(v).toLocaleString()}</div>
-              <div className="text-[1cqw] font-bold text-muted uppercase tracking-wider">{label}</div>
+              <div className="text-[1.2cqw] font-bold text-muted uppercase tracking-wider">{label}</div>
             </div>
           ))}
         </div>
