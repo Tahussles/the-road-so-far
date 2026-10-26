@@ -21,7 +21,7 @@ type Payload = { phase: 'intro' | 'go' | 'done'; boost: boolean; pct: number };
 
 function Screen({ players, taps, setPayload, onWin, accent }: ScreenProps) {
   const [phase, setPhase] = useState<Payload['phase']>('intro');
-  const target = Math.max(150, players.length * 18);
+  const target = Math.max(250, players.length * 30);
   const raw = sumTaps(taps);
   const base = useRef<number | null>(null);
   const boostAt = useRef<number | null>(null);
