@@ -184,7 +184,7 @@ function Title({ code, url, players }: { code: string; url: string; players: { i
         </div>
         <div className="flex flex-col items-center">
           <div className="bg-white p-[0.8cqw] rounded-lg shadow-sticker rotate-[2deg]">
-            <QRCodeSVG value={url} size={512} style={{ width: '22cqw', height: '22cqw' }} fgColor="#2f1604" bgColor="#ffffff" />
+            <QRCodeSVG value={url} size={512} style={{ width: '26cqw', height: '26cqw' }} fgColor="#2f1604" bgColor="#ffffff" />
           </div>
           <div className="font-display text-[2.4cqw] text-ink-brown mt-[1cqw]">Room {code}</div>
           <div className="text-[1.6cqw] text-ink-brown font-bold">{url.replace(/^https?:\/\//, '')}</div>
