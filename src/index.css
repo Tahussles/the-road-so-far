@@ -2,3 +2,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* presenter stage: fixed 16:9, letterboxed, cqw units inside */
+.rsf-stage {
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  container-type: inline-size;
+}
+.rsf-tag {
+  background: var(--paper); border: 0.3cqw solid #fff; box-shadow: var(--sticker-shadow);
+  border-radius: var(--radius); padding: 0.4cqw 1cqw; transform: rotate(-1.5deg); z-index: 30;
+}
+@keyframes rsf-pop { 0% { opacity: 0; scale: .7; } 70% { opacity: 1; scale: 1.05; } 100% { scale: 1; } }
+.rsf-pop { animation: rsf-pop .5s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes rsf-fadeup { from { opacity: 0; translate: 0 18px; } to { opacity: 1; translate: 0 0; } }
+.rsf-fadeup { opacity: 0; animation: rsf-fadeup .6s cubic-bezier(.34,1.56,.64,1) forwards; }
+@keyframes rsf-drift { from { transform: translateX(-60px); } to { transform: translateX(60px); } }
+.rsf-clouds-slow { animation: rsf-drift 28s ease-in-out infinite alternate; }
+.rsf-clouds-fast { animation: rsf-drift 16s ease-in-out infinite alternate-reverse; }
+@keyframes rsf-pin { 0% { transform: scale(0); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.rsf-pin { transform-box: fill-box; transform-origin: center; animation: rsf-pin .6s cubic-bezier(.34,1.56,.64,1) both; }
+.rsf-check { animation: rsf-pin .5s cubic-bezier(.34,1.56,.64,1) both; transform-box: fill-box; transform-origin: center; }
+@keyframes rsf-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.rsf-bounce { animation: rsf-bounce 1.6s ease-in-out infinite; }
+
+/* phone */
+.rsf-phone { min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
