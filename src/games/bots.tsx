@@ -8,7 +8,7 @@ const TASKS = ['Map', 'Bus animation', 'Realtime', 'Pick the Stack', 'Rebuild ga
 type Payload = { doing: string | null; done: number; total: number; pct: number };
 
 function Screen({ players, taps, setPayload, onWin, accent }: ScreenProps) {
-  const target = Math.max(200, players.length * 20);
+  const target = Math.max(250, players.length * 30);
   const per = target / TASKS.length;
   const total = sumTaps(taps);
   const progress = Math.min(TASKS.length, total / per);
