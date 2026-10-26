@@ -1,0 +1,42 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        'sky-top': 'var(--sky-top)',
+        'sky-bottom': 'var(--sky-bottom)',
+        teal: 'var(--teal)',
+        'teal-deep': 'var(--teal-deep)',
+        'teal-ink': 'var(--teal-ink)',
+        wood: 'var(--wood)',
+        'wood-dark': 'var(--wood-dark)',
+        'wood-deep': 'var(--wood-deep)',
+        'wood-shine': 'var(--wood-shine)',
+        paper: 'var(--paper)',
+        'paper-warm': 'var(--paper-warm)',
+        'paper-edge': 'var(--paper-edge)',
+        ink: 'var(--ink)',
+        'ink-brown': 'var(--ink-brown)',
+        muted: 'var(--muted)',
+        'red-deep': 'var(--red-deep)',
+        red: 'var(--red)',
+        'red-text': 'var(--red-text)',
+        leaf: 'var(--leaf)',
+        lime: 'var(--lime)',
+        'stop-goon': 'var(--stop-goon)',
+        'stop-hack': 'var(--stop-hack)',
+        'stop-af': 'var(--stop-af)',
+        'stop-grok': 'var(--stop-grok)',
+        bus: '#ffc83d',
+      },
+      fontFamily: {
+        display: ['Fredoka', 'system-ui', 'sans-serif'],
+        sans: ['Satoshi', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: { DEFAULT: 'var(--radius)', lg: 'var(--radius-lg)' },
+      boxShadow: { sticker: 'var(--sticker-shadow)' },
+    },
+  },
+  plugins: [],
+};

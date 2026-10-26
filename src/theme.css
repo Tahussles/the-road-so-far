@@ -1,0 +1,56 @@
+:root {
+  /* sky + mountains */
+  --sky-top: #6fd6ec;  --sky-bottom: #d6f6fb;
+  --teal: #007899;     --teal-deep: #006566;  --teal-ink: #002833;
+  /* wood table */
+  --wood: #bd580f;     --wood-dark: #8e420b;  --wood-deep: #5f2c07;  --wood-shine: #ed6e12;
+  /* parchment map */
+  --paper: #fdf7ea;    --paper-warm: #fdf7ce; --paper-edge: #f1dcbf;
+  /* ink + text */
+  --ink: #232b08;      --ink-brown: #2f1604;  --muted: #6b5a45;
+  /* brand reds + greens */
+  --red-deep: #7f1a1a; --red: #d42b2b;        --red-text: #aa2222;
+  --leaf: #698019;     --lime: #b9d35a;
+  --sunset: linear-gradient(90deg, #7f1a1a 0%, #d42b2b 60%, #ed6e12 100%);
+  --white: #ffffff;
+  /* per-stop accents */
+  --stop-goon: #ed6e12;  --stop-hack: #d42b2b;  --stop-af: #007899;  --stop-grok: #698019;
+  /* shape */
+  --radius: 8px; --radius-lg: 18px;
+  --sticker-border: 6px solid #fff;
+  --sticker-shadow: 0 10px 0 rgba(47,22,4,.18), 0 18px 30px rgba(47,22,4,.25);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--sky-bottom);
+  color: var(--ink);
+  font-family: 'Satoshi', system-ui, sans-serif;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3, .font-display { font-family: 'Fredoka', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+
+.sunset-text { background: var(--sunset); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.btn-sunset {
+  background: var(--sunset); color: #fff; font-weight: 700; border-radius: var(--radius);
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.3); border: 0; cursor: pointer;
+  transition: transform .08s, box-shadow .08s;
+}
+.btn-sunset:active { transform: translateY(3px); box-shadow: inset 0 -2px 0 rgba(0,0,0,.3); }
+.btn-paper {
+  background: var(--paper); color: var(--wood-deep); font-weight: 700; border-radius: var(--radius);
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.15); border: 0; cursor: pointer;
+  transition: transform .08s, box-shadow .08s;
+}
+.btn-paper:active { transform: translateY(3px); box-shadow: inset 0 -2px 0 rgba(0,0,0,.15); }
+
+.sticker { border: var(--sticker-border); box-shadow: var(--sticker-shadow); }
+.paper { background: var(--paper); color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
