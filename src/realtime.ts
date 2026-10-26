@@ -33,6 +33,7 @@ type Transport = {
   close: () => void;
 };
 
+// channel() is null until SUBSCRIBED, so nothing is sent on a half-open channel
 type Sub = { channel: () => RealtimeChannel | null; close: () => void };
 
 function subscribeWithRetry(
@@ -43,6 +44,7 @@ function subscribeWithRetry(
   onDown: () => void,
 ): Sub {
   let ch: RealtimeChannel | null = null;
+  let up = false;
   let closed = false;
   let backoff = 1000;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -53,13 +55,15 @@ function subscribeWithRetry(
       config: { broadcast: { self: false }, ...(presenceKey ? { presence: { key: presenceKey } } : {}) },
     });
     ch = c;
+    up = false;
     setup(c);
     c.subscribe((status, err) => {
       if (closed || c !== ch) return;
-      if (status === 'SUBSCRIBED') { backoff = 1000; onUp(c); return; }
+      if (status === 'SUBSCRIBED') { backoff = 1000; up = true; onUp(c); return; }
       console.warn(`realtime: ${topic} ${status}`, err?.message ?? '');
       onDown();
       ch = null;
+      up = false;
       supabase!.removeChannel(c);
       clearTimeout(timer);
       timer = setTimeout(connect, backoff);
@@ -68,7 +72,7 @@ function subscribeWithRetry(
   };
   connect();
   return {
-    channel: () => ch,
+    channel: () => (up ? ch : null),
     close: () => { closed = true; clearTimeout(timer); if (ch) supabase!.removeChannel(ch); ch = null; },
   };
 }
@@ -160,6 +164,7 @@ export function useHostRoom(state: RoomState) {
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [online, setOnline] = useState<Set<string>>(new Set());
   const [votes, setVotes] = useState<Record<string, number>>({});
+  const votesRef = useRef<Record<string, number>>({});
   const [taps, setTaps] = useState<Record<string, number>>({});
   const [sim, setSim] = useState(false);
   const [totals, setTotals] = useState<Totals>({ taps: 0, votes: 0 });
@@ -198,9 +203,16 @@ export function useHostRoom(state: RoomState) {
     if (!live.length) return;
     const voteIn = live.filter((i) => i.kind === 'vote');
     const tapIn = live.filter((i) => i.kind === 'tap');
-    if (voteIn.length) setVotes((v) => { const n = { ...v }; voteIn.forEach((i) => (n[i.id] = i.value)); return n; });
+    // totals count one vote per player per round, not every re-vote
+    let fresh = 0;
+    if (voteIn.length) {
+      const n = { ...votesRef.current };
+      voteIn.forEach((i) => { if (!(i.id in n)) fresh++; n[i.id] = i.value; });
+      votesRef.current = n;
+      setVotes(n);
+    }
     if (tapIn.length) setTaps((t) => { const n = { ...t }; tapIn.forEach((i) => (n[i.id] = (n[i.id] ?? 0) + i.value)); return n; });
-    setTotals((t) => ({ votes: t.votes + voteIn.length, taps: t.taps + tapIn.reduce((a, i) => a + i.value, 0) }));
+    setTotals((t) => ({ votes: t.votes + fresh, taps: t.taps + tapIn.reduce((a, i) => a + i.value, 0) }));
   }, []);
 
   useEffect(() => {
@@ -244,8 +256,8 @@ export function useHostRoom(state: RoomState) {
     return () => { clearInterval(join); clearInterval(loop); };
   }, [sim]);
 
-  const resetVotes = useCallback(() => setVotes({}), []);
-  const resetGame = useCallback(() => { setVotes({}); setTaps({}); }, []);
+  const resetVotes = useCallback(() => { votesRef.current = {}; setVotes({}); }, []);
+  const resetGame = useCallback(() => { votesRef.current = {}; setVotes({}); setTaps({}); }, []);
   const list = Object.values(players);
   // with Supabase, count phones currently in presence (plus sim); locally there is no presence
   const count = HAS_SUPABASE ? list.filter((p) => p.id.startsWith('sim-') || online.has(p.id)).length : list.length;

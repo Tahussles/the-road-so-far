@@ -280,7 +280,14 @@ function Placeholder({ k }: { k: number }) {
 function Win({ k, summary, next }: { k: number; summary?: Summary; next: string }) {
   const s = STOPS[k];
   const line = summary?.line?.trim() || s.win;
-  const stats = summary?.stats ? Object.entries(summary.stats) : [];
+  const raw = { ...(summary?.stats ?? {}) };
+  // "4 correct" + "4 of" reads better as one "4/4 correct" chip
+  const merged: [string, string | number][] = [];
+  if ('correct' in raw && ('of' in raw || 'rounds' in raw)) {
+    merged.push(['correct', `${raw.correct}/${raw.of ?? raw.rounds}`]);
+    delete raw.correct; delete raw.of; delete raw.rounds;
+  }
+  const stats = [...merged, ...Object.entries(raw)];
   return (
     <div className="absolute inset-0 flex items-center justify-center">
       <div className="relative paper sticker rounded-lg rotate-[1deg] px-[4cqw] py-[3cqw] text-center max-w-[60cqw] rsf-pop" style={{ borderWidth: '0.5cqw' }}>
@@ -297,7 +304,7 @@ function Win({ k, summary, next }: { k: number; summary?: Summary; next: string 
             {stats.map(([key, v]) => (
               <div key={key} className="bg-white rounded-lg shadow-sticker px-[1.2cqw] py-[0.6cqw]">
                 <div className="font-display text-[2.2cqw] leading-none" style={{ color: accentVar(k) }}>{v}</div>
-                <div className="text-[1.1cqw] font-bold text-muted uppercase tracking-wider">{key}</div>
+                <div className="text-[1.1cqw] font-bold text-muted uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</div>
               </div>
             ))}
           </div>
